@@ -11,16 +11,14 @@ function App() {
   const [airports, setAirports] = useState([]);
   const [source, setSource] = useState("DEL");
   const [destination, setDestination] = useState("BOM");
-  const [route, setRoute] = useState("");
+  const [route, setRoute] = useState(null);
 
   useEffect(() => {
 
     axios
       .get("http://localhost:5000/api/airports")
       .then((res) => {
-
         setAirports(res.data);
-
       })
       .catch(console.error);
 
@@ -28,32 +26,27 @@ function App() {
 
   async function findRoute() {
 
-  try {
+    try {
 
-    const res = await axios.post(
-      "http://localhost:5000/api/routes",
-      {
-        source,
-        destination
-      }
-    );
+      const res = await axios.get(
+        `http://localhost:5000/api/route?source=${source}&destination=${destination}`
+      );
 
-    setRoute(res.data);
+      setRoute(res.data);
 
-  }
-  catch (err) {
+    } catch (err) {
 
-    console.error(err);
+      console.error(err);
+
+    }
 
   }
-
-}
 
   return (
 
     <div className="container">
 
-      <h1> Viman</h1>
+      <h1>Viman</h1>
 
       <h3>Airline Route Optimizer</h3>
 
@@ -69,16 +62,11 @@ function App() {
       <ResultCard route={route} />
 
       <MapView
-
-airports={airports}
-
-route={route}
-
-source={source}
-
-destination={destination}
-
-/>
+        airports={airports}
+        route={route}
+        source={source}
+        destination={destination}
+      />
 
     </div>
 

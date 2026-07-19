@@ -4,40 +4,64 @@
 #include <sstream>
 #include <iostream>
 #include <queue>
-#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 #include <cmath>
 #include <climits>
 
-AlgorithmUtils::AlgorithmUtils(
-    const std::string& graphFile,
-    const std::string& coordinateFile)
+using namespace std;
+
+static int getWeight(const Edge& edge, OptimizationMode mode)
 {
-    loadGraph(graphFile);
-    coordinates = CoordinateLoader::loadCoordinates(coordinateFile);
+    switch (mode)
+    {
+        case OptimizationMode::DISTANCE:
+            return edge.distance;
+
+        case OptimizationMode::TIME:
+            return edge.time;
+
+        case OptimizationMode::COST:
+            return edge.cost;
+    }
+
+    return edge.distance;
 }
 
-void AlgorithmUtils::loadGraph(const std::string& filename)
+AlgorithmUtils::AlgorithmUtils(
+    const string& graphFile,
+    const string& coordinateFile)
 {
-    std::ifstream file(filename);
+    loadGraph(graphFile);
+    coordinates =
+        CoordinateLoader::loadCoordinates(
+            coordinateFile
+        );
+}
+
+void AlgorithmUtils::loadGraph(
+    const string& filename)
+{
+    ifstream file(filename);
 
     if (!file.is_open())
     {
-        std::cerr << "Unable to open graph file: "
-                  << filename << std::endl;
+        cerr << "Unable to open graph file: "
+             << filename << endl;
         return;
     }
 
-    std::string line;
+    string line;
 
-    while (std::getline(file, line))
+    while (getline(file, line))
     {
         if (line.empty())
             continue;
 
-        std::stringstream ss(line);
+        stringstream ss(line);
 
-        std::string source;
+        string source;
+
         Edge edge;
 
         ss >> source
@@ -62,122 +86,167 @@ void AlgorithmUtils::loadGraph(const std::string& filename)
 }
 
 double AlgorithmUtils::heuristic(
-    const std::string& source,
-    const std::string& destination)
+    const string& source,
+    const string& destination)
 {
-    if (coordinates.find(source) == coordinates.end())
+    if (coordinates.find(source) ==
+        coordinates.end())
         return 0;
 
-    if (coordinates.find(destination) == coordinates.end())
+    if (coordinates.find(destination) ==
+        coordinates.end())
         return 0;
 
-    double lat1 = coordinates[source].latitude;
-    double lon1 = coordinates[source].longitude;
+    const Coordinate& a =
+        coordinates[source];
 
-    double lat2 = coordinates[destination].latitude;
-    double lon2 = coordinates[destination].longitude;
+    const Coordinate& b =
+        coordinates[destination];
 
-    double dx = lat1 - lat2;
-    double dy = lon1 - lon2;
+    double dx =
+        a.latitude -
+        b.latitude;
 
-    return std::sqrt(dx * dx + dy * dy);
+    double dy =
+        a.longitude -
+        b.longitude;
+
+    return sqrt(dx * dx + dy * dy);
 }
-
-std::vector<std::string> AlgorithmUtils::dijkstra(
-    const std::string& source,
-    const std::string& destination)
+RouteResult AlgorithmUtils::dijkstra(
+    const string& source,
+    const string& destination,
+    OptimizationMode mode)
 {
-    using Node = std::pair<int, std::string>;
+    using Node = pair<int, string>;
 
-    std::priority_queue<
+    priority_queue<
         Node,
-        std::vector<Node>,
-        std::greater<Node>
+        vector<Node>,
+        greater<Node>
     > pq;
 
-    std::unordered_map<std::string, int> distance;
-    std::unordered_map<std::string, std::string> parent;
+    unordered_map<string, int> dist;
+    unordered_map<string, string> parent;
 
-    for (auto& airport : graph)
-        distance[airport.first] = INT_MAX;
+    for (const auto& airport : graph)
+    {
+        dist[airport.first] = INT_MAX;
+    }
 
-    distance[source] = 0;
+    dist[source] = 0;
 
     pq.push({0, source});
 
     while (!pq.empty())
-    {
-        auto current = pq.top();
-        pq.pop();
+{
+    Node top = pq.top();
+    pq.pop();
 
-        int currentDistance = current.first;
-        std::string airport = current.second;
+    int currentWeight = top.first;
+    std::string current = top.second;
 
-        if (airport == destination)
+        if (currentWeight > dist[current])
+            continue;
+
+        if (current == destination)
             break;
 
-        for (const Edge& edge : graph[airport])
+        for (const Edge& edge : graph[current])
         {
-            int newDistance =
-                currentDistance + edge.distance;
+            int weight = getWeight(edge, mode);
 
-            if (newDistance < distance[edge.destination])
+            int newWeight =
+                currentWeight + weight;
+
+            if (newWeight < dist[edge.destination])
             {
-                distance[edge.destination] = newDistance;
-                parent[edge.destination] = airport;
+                dist[edge.destination] =
+                    newWeight;
+
+                parent[edge.destination] =
+                    current;
 
                 pq.push({
-                    newDistance,
+                    newWeight,
                     edge.destination
                 });
             }
         }
     }
 
-    std::vector<std::string> path;
+    RouteResult result;
 
-    if (distance[destination] == INT_MAX)
-        return path;
+    if (dist[destination] == INT_MAX)
+        return result;
 
-    std::string current = destination;
+    vector<string> reversePath;
+
+    string current = destination;
 
     while (current != source)
     {
-        path.push_back(current);
+        reversePath.push_back(current);
         current = parent[current];
     }
 
-    path.push_back(source);
+    reversePath.push_back(source);
 
-    std::reverse(path.begin(), path.end());
+    reverse(
+        reversePath.begin(),
+        reversePath.end()
+    );
 
-    return path;
+    result.path = reversePath;
+
+    for (size_t i = 0;
+         i + 1 < result.path.size();
+         i++)
+    {
+        string u = result.path[i];
+        string v = result.path[i + 1];
+
+        for (const Edge& edge : graph[u])
+        {
+            if (edge.destination == v)
+            {
+                result.distance += edge.distance;
+                result.time += edge.time;
+                result.cost += edge.cost;
+                break;
+            }
+        }
+    }
+
+    return result;
 }
-
-std::vector<std::string> AlgorithmUtils::aStar(
-    const std::string& source,
-    const std::string& destination)
+RouteResult AlgorithmUtils::aStar(
+    const string& source,
+    const string& destination,
+    OptimizationMode mode)
 {
-    using Node = std::pair<double, std::string>;
+    using Node = pair<double, string>;
 
-    std::priority_queue<
+    priority_queue<
         Node,
-        std::vector<Node>,
-        std::greater<Node>
+        vector<Node>,
+        greater<Node>
     > open;
 
-    std::unordered_map<std::string, double> gScore;
-    std::unordered_map<std::string, double> fScore;
-    std::unordered_map<std::string, std::string> parent;
+    unordered_map<string, double> gScore;
+    unordered_map<string, double> fScore;
+    unordered_map<string, string> parent;
 
-    for (auto& airport : graph)
+    for (const auto& airport : graph)
     {
         gScore[airport.first] = 1e18;
         fScore[airport.first] = 1e18;
     }
 
     gScore[source] = 0;
-    fScore[source] = heuristic(source, destination);
+
+    fScore[source] =
+        heuristic(source, destination);
 
     open.push({
         fScore[source],
@@ -186,7 +255,9 @@ std::vector<std::string> AlgorithmUtils::aStar(
 
     while (!open.empty())
     {
-        std::string current = open.top().second;
+        string current =
+            open.top().second;
+
         open.pop();
 
         if (current == destination)
@@ -195,13 +266,17 @@ std::vector<std::string> AlgorithmUtils::aStar(
         for (const Edge& edge : graph[current])
         {
             double tentative =
-                gScore[current] + edge.distance;
+                gScore[current] +
+                getWeight(edge, mode);
 
-            if (tentative < gScore[edge.destination])
+            if (tentative <
+                gScore[edge.destination])
             {
-                parent[edge.destination] = current;
+                parent[edge.destination] =
+                    current;
 
-                gScore[edge.destination] = tentative;
+                gScore[edge.destination] =
+                    tentative;
 
                 fScore[edge.destination] =
                     tentative +
@@ -218,22 +293,49 @@ std::vector<std::string> AlgorithmUtils::aStar(
         }
     }
 
-    std::vector<std::string> path;
+    RouteResult result;
 
-    if (parent.find(destination) == parent.end())
-        return path;
+    if (parent.find(destination) ==
+        parent.end())
+        return result;
 
-    std::string current = destination;
+    vector<string> reversePath;
+
+    string current = destination;
 
     while (current != source)
     {
-        path.push_back(current);
+        reversePath.push_back(current);
         current = parent[current];
     }
 
-    path.push_back(source);
+    reversePath.push_back(source);
 
-    std::reverse(path.begin(), path.end());
+    reverse(
+        reversePath.begin(),
+        reversePath.end()
+    );
 
-    return path;
+    result.path = reversePath;
+
+    for (size_t i = 0;
+         i + 1 < result.path.size();
+         i++)
+    {
+        string u = result.path[i];
+        string v = result.path[i + 1];
+
+        for (const Edge& edge : graph[u])
+        {
+            if (edge.destination == v)
+            {
+                result.distance += edge.distance;
+                result.time += edge.time;
+                result.cost += edge.cost;
+                break;
+            }
+        }
+    }
+
+    return result;
 }
