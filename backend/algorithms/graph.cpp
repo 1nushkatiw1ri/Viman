@@ -16,31 +16,48 @@ int main(int argc, char* argv[])
     std::string destination = argv[2];
 
     AlgorithmUtils algorithm(
-    "graph.txt",
-    "coordinates.txt"
-);
+        "graph.txt",
+        "coordinates.txt"
+    );
 
-    std::vector<std::string> path =
-        algorithm.dijkstra(source, destination);
+    RouteResult result =
+        algorithm.dijkstra(
+            source,
+            destination,
+            OptimizationMode::DISTANCE
+        );
 
-    if (path.empty())
+    if (result.path.empty())
     {
         std::cout << "{ \"error\": \"Route not found\" }";
         return 0;
     }
 
     std::cout << "{";
+
     std::cout << "\"path\":[";
 
-    for (size_t i = 0; i < path.size(); i++)
+    for (size_t i = 0; i < result.path.size(); i++)
     {
-        std::cout << "\"" << path[i] << "\"";
+        std::cout << "\"" << result.path[i] << "\"";
 
-        if (i + 1 != path.size())
+        if (i + 1 != result.path.size())
             std::cout << ",";
     }
 
-    std::cout << "]";
+    std::cout << "],";
+
+    std::cout << "\"distance\":"
+              << result.distance
+              << ",";
+
+    std::cout << "\"time\":"
+              << result.time
+              << ",";
+
+    std::cout << "\"cost\":"
+              << result.cost;
+
     std::cout << "}";
 
     return 0;

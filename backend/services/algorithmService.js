@@ -9,23 +9,27 @@ async function findRoute(source, destination) {
 
     for (const airport of result.path) {
 
-        const query = await pool.query(
-            `SELECT latitude, longitude
-             FROM airports
-             WHERE iata = $1`,
-            [airport]
-        );
+    console.log("Searching:", airport);
 
-        if (query.rows.length) {
+    const query = await pool.query(
+        `SELECT latitude, longitude
+         FROM airports
+         WHERE iata = $1`,
+        [airport]
+    );
 
-            coordinates.push([
-                Number(query.rows[0].latitude),
-                Number(query.rows[0].longitude)
-            ]);
+    console.log(query.rows);
 
-        }
+    if (query.rows.length) {
+
+        coordinates.push([
+            Number(query.rows[0].latitude),
+            Number(query.rows[0].longitude)
+        ]);
 
     }
+
+}
 
     return {
         path: result.path,
